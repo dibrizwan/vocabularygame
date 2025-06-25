@@ -1,0 +1,188 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary Game for Grade 5</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-r from-blue-200 via-purple-200 to-pink-200 min-h-screen flex items-center justify-center p-4">
+    <div id="game-container" class="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full text-center">
+        <h1 class="text-3xl font-bold text-purple-600 mb-4">Vocabulary Adventure</h1>
+        <div id="start-screen">
+            <p class="text-lg font-semibold text-blue-500 mb-4">Learn these 5th Grade Vocabulary Words:</p>
+            <ul id="vocab-list" class="text-left text-gray-800 mb-6"></ul>
+            <button id="start-btn" class="bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600">Start Game</button>
+        </div>
+        <div id="game-screen" class="hidden">
+            <p id="score" class="text-lg font-semibold text-blue-500 mb-4">Score: 0</p>
+            <p id="question" class="text-xl font-medium text-gray-800 mb-6"></p>
+            <div id="options" class="grid gap-4"></div>
+            <p id="feedback" class="text-lg mt-4 font-medium"></p>
+            <button id="next-btn" class="mt-6 bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 hidden">Next Question</button>
+        </div>
+    </div>
+
+    <script>
+        const vocabulary = [
+            { word: "Abundant", meaning: "Plentiful", options: ["Plentiful", "Scarce", "Tiny", "Loud"], level: "intermediate" },
+            { word: "Accurate", meaning: "Correct", options: ["Correct", "Wrong", "Fast", "Heavy"], level: "basic" },
+            { word: "Brilliant", meaning: "Very bright", options: ["Very bright", "Very dull", "Very loud", "Very soft"], level: "basic" },
+            { word: "Capture", meaning: "To catch", options: ["To catch", "To release", "To hide", "To break"], level: "basic" },
+            { word: "Cautious", meaning: "Careful", options: ["Careful", "Reckless", "Loud", "Slow"], level: "basic" },
+            { word: "Confident", meaning: "Sure of oneself", options: ["Sure of oneself", "Doubtful", "Angry", "Tired"], level: "basic" },
+            { word: "Curious", meaning: "Eager to learn", options: ["Eager to learn", "Eager to sleep", "Eager to hide", "Eager to run"], level: "basic" },
+            { word: "Diligent", meaning: "Hard-working", options: ["Hard-working", "Lazy", "Careless", "Playful"], level: "intermediate" },
+            { word: "Enormous", meaning: "Very large", options: ["Very large", "Very small", "Very loud", "Very fast"], level: "basic" },
+            { word: "Fragile", meaning: "Easily broken", options: ["Easily broken", "Very strong", "Very heavy", "Very soft"], level: "basic" },
+            { word: "Generous", meaning: "Willing to give", options: ["Willing to give", "Selfish", "Angry", "Quiet"], level: "basic" },
+            { word: "Gleeful", meaning: "Full of joy", options: ["Full of joy", "Full of anger", "Full of sorrow", "Full of fear"], level: "basic" },
+            { word: "Hazard", meaning: "Danger", options: ["Danger", "Safety", "Joy", "Peace"], level: "intermediate" },
+            { word: "Immense", meaning: "Huge", options: ["Huge", "Tiny", "Light", "Slow"], level: "intermediate" },
+            { word: "Obstinate", meaning: "Stubborn", options: ["Stubborn", "Flexible", "Kind", "Quiet"], level: "intermediate" },
+            { word: "Perplexed", meaning: "Confused", options: ["Confused", "Excited", "Relaxed", "Bored"], level: "intermediate" },
+            { word: "Rapid", meaning: "Very fast", options: ["Very fast", "Very slow", "Very tall", "Very heavy"], level: "basic" },
+            { word: "Resilient", meaning: "Able to recover", options: ["Able to recover", "Able to shrink", "Able to vanish", "Able to break"], level: "intermediate" },
+            { word: "Sincere", meaning: "Honest", options: ["Honest", "Dishonest", "Loud", "Fast"], level: "basic" },
+            { word: "Swift", meaning: "Quick", options: ["Quick", "Slow", "Tall", "Heavy"], level: "basic" },
+            { word: "Tremendous", meaning: "Very great", options: ["Very great", "Very small", "Very quiet", "Very weak"], level: "intermediate" },
+            { word: "Vivid", meaning: "Bright and clear", options: ["Bright and clear", "Dull and faded", "Soft and quiet", "Dark and gloomy"], level: "basic" },
+            { word: "Weary", meaning: "Very tired", options: ["Very tired", "Very energetic", "Very happy", "Very angry"], level: "intermediate" },
+            { word: "Witty", meaning: "Clever and funny", options: ["Clever and funny", "Dull and boring", "Sad and quiet", "Angry and loud"], level: "intermediate" },
+            { word: "Zealous", meaning: "Enthusiastic", options: ["Enthusiastic", "Bored", "Tired", "Calm"], level: "intermediate" }
+        ];
+
+        let currentQuestion = 0;
+        let score = 0;
+        let shuffledVocab = [];
+
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const vocabListEl = document.getElementById('vocab-list');
+        const questionEl = document.getElementById('question');
+        const optionsEl = document.getElementById('options');
+        const feedbackEl = document.getElementById('feedback');
+        const scoreEl = document.getElementById('score');
+        const startBtn = document.getElementById('start-btn');
+        const nextBtn = document.getElementById('next-btn');
+
+        function displayVocabList() {
+            vocabListEl.innerHTML = '';
+            vocabulary.forEach(vocab => {
+                const li = document.createElement('li');
+                li.textContent = `${vocab.word}: ${vocab.meaning}`;
+                li.className = 'mb-2';
+                vocabListEl.appendChild(li);
+            });
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function startGame() {
+            shuffledVocab = shuffle([...vocabulary]);
+            score = 0;
+            currentQuestion = 0;
+            scoreEl.textContent = `Score: ${score}`;
+            startScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            if (currentQuestion >= shuffledVocab.length) {
+                questionEl.textContent = "Game Over!";
+                optionsEl.innerHTML = '';
+                feedbackEl.textContent = `Final Score: ${score} out of ${shuffledVocab.length}`;
+                nextBtn.classList.add('hidden');
+                return;
+            }
+
+            const vocab = shuffledVocab[currentQuestion];
+            questionEl.textContent = `What does "${vocab.word}" mean?`;
+            optionsEl.innerHTML = '';
+            feedbackEl.textContent = '';
+            nextBtn.classList.add('hidden');
+
+            vocab.options.forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.className = 'bg-blue-400 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-500';
+                button.addEventListener('click', () => checkAnswer(option, vocab.meaning));
+                optionsEl.appendChild(button);
+            });
+        }
+
+        function checkAnswer(selected, correct) {
+            const buttons = optionsEl.getElementsByTagName('button');
+            for (let button of buttons) {
+                button.disabled = true;
+            }
+
+            if (selected === correct) {
+                score++;
+                scoreEl.textContent = `Score: ${score}`;
+                feedbackEl.textContent = "Correct! Great job!";
+                feedbackEl.className = 'text-lg mt-4 font-medium text-green-600';
+            } else {
+                feedbackEl.textContent = `Oops! The correct answer is "${correct}".`;
+                feedbackEl.className = 'text-lg mt-4 font-medium text-red-600';
+            }
+
+            nextBtn.classList.remove('hidden');
+        }
+
+        startBtn.addEventListener('click', startGame);
+        nextBtn.addEventListener('click', () => {
+            currentQuestion++;
+            loadQuestion();
+        });
+
+        displayVocabList();
+    </script>
+</body>
+</html>
